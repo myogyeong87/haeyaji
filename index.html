@@ -6,7 +6,7 @@
 <title>해야지</title>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <style>
 :root {
   --bg: #F8F9FA;
@@ -1371,52 +1371,57 @@ function saveDate(todoId) {
 }
 
 /* ============================================================
-   CLOUD SYNC (Firebase Realtime Database)
+   CLOUD SYNC (Firebase Firestore)
    ============================================================ */
-let _fbApp  = null;
-let _fbDb   = null;
-let _syncCode  = null;
-let _pushing   = false; // prevents listener→save loop
+const FIREBASE_CONFIG = {
+  apiKey:            "AIzaSyDP2E09PW3ZOMLRTY0NA4l5tkiCxgxDqWM",
+  authDomain:        "haeyaji.firebaseapp.com",
+  projectId:         "haeyaji",
+  storageBucket:     "haeyaji.firebasestorage.app",
+  messagingSenderId: "1042853059537",
+  appId:             "1:1042853059537:web:4d9f03269f51a0a591def0"
+};
 
-function _syncCfg() {
-  try { return JSON.parse(localStorage.getItem('haeyaji_fb_cfg') || 'null'); }
-  catch(e) { return null; }
+let _fbApp   = null;
+let _fStore  = null;
+let _unsub   = null;
+let _syncCode = localStorage.getItem('haeyaji_sync_code') || null;
+let _pushing  = false;
+
+function _initFirebase() {
+  if (_fStore) return;
+  try {
+    try { _fbApp = firebase.app('haeyaji'); }
+    catch(e) { _fbApp = firebase.initializeApp(FIREBASE_CONFIG, 'haeyaji'); }
+    _fStore = firebase.firestore(_fbApp);
+  } catch(e) { console.error('Firebase 초기화 실패', e); }
 }
 
 function initSync() {
-  const cfg = _syncCfg();
-  _syncCode = localStorage.getItem('haeyaji_sync_code') || null;
-  if (!cfg || !_syncCode) { setSyncStatus('off'); return; }
-  try {
-    if (!_fbApp) {
-      try { _fbApp = firebase.app('haeyaji'); }
-      catch(e) { _fbApp = firebase.initializeApp(cfg, 'haeyaji'); }
-      _fbDb = firebase.database(_fbApp);
-    }
-    setSyncStatus('syncing');
-    _fbDb.ref('rooms/' + _syncCode).on('value', snap => {
-      const remote = snap.val();
-      if (remote && !_pushing) {
-        db = migrate(JSON.parse(JSON.stringify(remote)));
-        localStorage.setItem(KEY_V2, JSON.stringify(db));
-        render();
-      } else if (!remote) {
-        // 처음 연결 시 로컬 데이터를 클라우드로 올림
-        _fbDb.ref('rooms/' + _syncCode).set(db);
+  _initFirebase();
+  if (!_syncCode) { setSyncStatus('off'); return; }
+  if (_unsub) { _unsub(); _unsub = null; }
+  setSyncStatus('syncing');
+  _unsub = _fStore.collection('rooms').doc(_syncCode)
+    .onSnapshot(snap => {
+      if (snap.exists) {
+        if (!_pushing) {
+          db = migrate(JSON.parse(JSON.stringify(snap.data())));
+          localStorage.setItem(KEY_V2, JSON.stringify(db));
+          render();
+        }
+      } else {
+        _fStore.collection('rooms').doc(_syncCode).set(db);
       }
       setSyncStatus('ok');
     }, () => setSyncStatus('error'));
-  } catch(e) {
-    console.error('Firebase 초기화 오류:', e);
-    setSyncStatus('error');
-  }
 }
 
 function pushToCloud() {
-  if (!_fbDb || !_syncCode) return;
+  if (!_fStore || !_syncCode) return;
   _pushing = true;
   setSyncStatus('syncing');
-  _fbDb.ref('rooms/' + _syncCode).set(db)
+  _fStore.collection('rooms').doc(_syncCode).set(db)
     .then(() => { _pushing = false; setSyncStatus('ok'); })
     .catch(() => { _pushing = false; setSyncStatus('error'); });
 }
@@ -1437,30 +1442,19 @@ function setSyncStatus(s) {
 }
 
 function openSyncModal() {
-  const cfg  = _syncCfg();
   const code = _syncCode || '';
-  const cfgStr = cfg ? JSON.stringify(cfg, null, 2) : '';
   openOv(`
-    <div class="mtitle">☁️ 클라우드 동기화</div>
+    <div class="mtitle">☁️ 기기 간 동기화</div>
     <p style="font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:20px">
-      Firebase를 연결하면 여러 기기에서 같은 데이터를 사용할 수 있어요.<br>
-      <a href="https://console.firebase.google.com" target="_blank"
-        style="color:var(--main);font-weight:600">Firebase 콘솔 →</a>
-      에서 무료 프로젝트를 만든 후 아래에 설정값을 붙여넣어 주세요.
+      여러 기기에서 같은 할 일을 보려면 동기화 코드를 설정해주세요.<br>
+      같은 코드를 쓰는 기기끼리 실시간으로 데이터가 공유돼요.
     </p>
     <div class="fg">
-      <label class="fl">Firebase 설정 (firebaseConfig 객체)</label>
-      <textarea class="fta" id="m-fbcfg"
-        style="font-size:12px;font-family:monospace;min-height:130px"
-        placeholder='{\n  "apiKey": "...",\n  "databaseURL": "https://프로젝트명-rtdb.firebaseio.com",\n  "projectId": "..."\n}'>${esc(cfgStr)}</textarea>
-    </div>
-    <div class="fg">
-      <label class="fl">동기화 코드 — 내 기기끼리만 공유하는 비밀 코드</label>
-      <input class="fi" id="m-scode"
-        placeholder="예: myclass-2025" value="${esc(code)}">
+      <label class="fl">동기화 코드 — 나만 아는 비밀 코드</label>
+      <input class="fi" id="m-scode" placeholder="예: myclass-2025" value="${esc(code)}">
     </div>
     <div class="mfoot" style="justify-content:space-between">
-      ${cfg
+      ${_syncCode
         ? `<button class="btn btn-d" onclick="disconnectSync()">연결 해제</button>`
         : `<div></div>`}
       <div style="display:flex;gap:10px">
@@ -1471,20 +1465,11 @@ function openSyncModal() {
 }
 
 function saveSync() {
-  const cfgStr = document.getElementById('m-fbcfg').value.trim();
-  const code   = document.getElementById('m-scode').value.trim();
-  if (!cfgStr || !code) { toast('설정값과 동기화 코드를 모두 입력해주세요'); return; }
-  let cfg;
-  try { cfg = JSON.parse(cfgStr); } catch(e) {
-    toast('JSON 형식이 올바르지 않아요. { } 안의 내용을 확인해주세요'); return;
-  }
-  if (!cfg.databaseURL) {
-    toast('databaseURL이 없어요. Firebase 콘솔에서 Realtime Database를 먼저 만들어주세요'); return;
-  }
-  localStorage.setItem('haeyaji_fb_cfg',  JSON.stringify(cfg));
+  const code = document.getElementById('m-scode').value.trim();
+  if (!code) { toast('동기화 코드를 입력해주세요'); return; }
+  if (_unsub) { _unsub(); _unsub = null; }
+  _syncCode = code;
   localStorage.setItem('haeyaji_sync_code', code);
-  if (_fbDb && _syncCode) _fbDb.ref('rooms/' + _syncCode).off();
-  _fbApp = null; _fbDb = null;
   closeOv();
   toast('☁️ 동기화를 시작할게요!');
   initSync();
@@ -1492,10 +1477,9 @@ function saveSync() {
 
 function disconnectSync() {
   if (!confirm('동기화 연결을 해제할까요?\n데이터는 이 기기에 그대로 남아요.')) return;
-  if (_fbDb && _syncCode) _fbDb.ref('rooms/' + _syncCode).off();
-  localStorage.removeItem('haeyaji_fb_cfg');
+  if (_unsub) { _unsub(); _unsub = null; }
   localStorage.removeItem('haeyaji_sync_code');
-  _fbApp = null; _fbDb = null; _syncCode = null;
+  _syncCode = null;
   closeOv();
   setSyncStatus('off');
   toast('동기화 연결을 해제했어요');
