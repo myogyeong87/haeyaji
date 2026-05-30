@@ -432,13 +432,6 @@ body {
 
 /* ── SYNC ── */
 .sidebar-footer { display: flex; flex-direction: column; gap: 8px; }
-.sync-btn {
-  background: none; border: none; cursor: pointer;
-  color: var(--sub); display: flex; align-items: center; gap: 6px;
-  font-size: 12px; padding: 0; font-family: inherit;
-  transition: color .15s;
-}
-.sync-btn:hover { color: var(--text); }
 .sync-dot {
   width: 7px; height: 7px; border-radius: 50%;
   background: var(--border); flex-shrink: 0;
@@ -481,10 +474,10 @@ body {
   </nav>
   <div class="sidebar-footer">
     <div>made by 키키쌤 🧙‍♀️</div>
-    <button class="sync-btn" onclick="openSyncModal()">
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)">
       <span class="sync-dot" id="sync-dot"></span>
-      <span id="sync-label">동기화 설정</span>
-    </button>
+      <span id="sync-label">연결 중…</span>
+    </div>
   </div>
 </aside>
 
@@ -563,11 +556,9 @@ body {
 
   <div class="mob-footer">
     made by 키키쌤 🧙‍♀️
-    <div style="margin-top:6px">
-      <button class="sync-btn" style="display:inline-flex" onclick="openSyncModal()">
-        <span class="sync-dot" id="sync-dot-mob"></span>
-        <span id="sync-label-mob">동기화 설정</span>
-      </button>
+    <div style="margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px">
+      <span class="sync-dot" id="sync-dot-mob"></span>
+      <span id="sync-label-mob" style="font-size:12px;color:var(--sub)">연결 중…</span>
     </div>
   </div>
 </main>
@@ -1371,7 +1362,7 @@ function saveDate(todoId) {
 }
 
 /* ============================================================
-   CLOUD SYNC (Firebase Firestore)
+   CLOUD SYNC (Firebase Firestore — haeyaji/data 고정 경로)
    ============================================================ */
 const FIREBASE_CONFIG = {
   apiKey:            "AIzaSyDP2E09PW3ZOMLRTY0NA4l5tkiCxgxDqWM",
@@ -1382,11 +1373,12 @@ const FIREBASE_CONFIG = {
   appId:             "1:1042853059537:web:4d9f03269f51a0a591def0"
 };
 
-let _fbApp   = null;
-let _fStore  = null;
-let _unsub   = null;
-let _syncCode = localStorage.getItem('haeyaji_sync_code') || null;
-let _pushing  = false;
+const SYNC_DOC = () => _fStore.collection('haeyaji').doc('data');
+
+let _fbApp  = null;
+let _fStore = null;
+let _unsub  = null;
+let _pushing = false;
 
 function _initFirebase() {
   if (_fStore) return;
@@ -1399,90 +1391,42 @@ function _initFirebase() {
 
 function initSync() {
   _initFirebase();
-  if (!_syncCode) { setSyncStatus('off'); return; }
+  if (!_fStore) { setSyncStatus('error'); return; }
   if (_unsub) { _unsub(); _unsub = null; }
   setSyncStatus('syncing');
-  _unsub = _fStore.collection('rooms').doc(_syncCode)
-    .onSnapshot(snap => {
-      if (snap.exists) {
-        if (!_pushing) {
-          db = migrate(JSON.parse(JSON.stringify(snap.data())));
-          localStorage.setItem(KEY_V2, JSON.stringify(db));
-          render();
-        }
-      } else {
-        _fStore.collection('rooms').doc(_syncCode).set(db);
+  _unsub = SYNC_DOC().onSnapshot(snap => {
+    if (snap.exists) {
+      if (!_pushing) {
+        db = migrate(JSON.parse(JSON.stringify(snap.data())));
+        localStorage.setItem(KEY_V2, JSON.stringify(db));
+        render();
       }
-      setSyncStatus('ok');
-    }, () => setSyncStatus('error'));
+    } else {
+      SYNC_DOC().set(db);
+    }
+    setSyncStatus('ok');
+  }, () => setSyncStatus('error'));
 }
 
 function pushToCloud() {
-  if (!_fStore || !_syncCode) return;
+  if (!_fStore) return;
   _pushing = true;
   setSyncStatus('syncing');
-  _fStore.collection('rooms').doc(_syncCode).set(db)
+  SYNC_DOC().set(db)
     .then(() => { _pushing = false; setSyncStatus('ok'); })
     .catch(() => { _pushing = false; setSyncStatus('error'); });
 }
 
 function setSyncStatus(s) {
-  const LABELS = {
-    off: '동기화 설정', syncing: '동기화 중…',
-    ok: '동기화 됨', error: '동기화 오류'
-  };
+  const LABELS = { syncing: '동기화 중…', ok: '동기화 됨', error: '동기화 오류' };
   ['sync-dot', 'sync-dot-mob'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.className = 'sync-dot' + (s !== 'off' ? ' ' + s : '');
+    if (el) el.className = 'sync-dot ' + s;
   });
   ['sync-label', 'sync-label-mob'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.textContent = LABELS[s] || '동기화 설정';
+    if (el) el.textContent = LABELS[s] || '동기화 중…';
   });
-}
-
-function openSyncModal() {
-  const code = _syncCode || '';
-  openOv(`
-    <div class="mtitle">☁️ 기기 간 동기화</div>
-    <p style="font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:20px">
-      여러 기기에서 같은 할 일을 보려면 동기화 코드를 설정해주세요.<br>
-      같은 코드를 쓰는 기기끼리 실시간으로 데이터가 공유돼요.
-    </p>
-    <div class="fg">
-      <label class="fl">동기화 코드 — 나만 아는 비밀 코드</label>
-      <input class="fi" id="m-scode" placeholder="예: myclass-2025" value="${esc(code)}">
-    </div>
-    <div class="mfoot" style="justify-content:space-between">
-      ${_syncCode
-        ? `<button class="btn btn-d" onclick="disconnectSync()">연결 해제</button>`
-        : `<div></div>`}
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-g" onclick="closeOv()">취소</button>
-        <button class="btn btn-p" onclick="saveSync()">저장 &amp; 연결</button>
-      </div>
-    </div>`);
-}
-
-function saveSync() {
-  const code = document.getElementById('m-scode').value.trim();
-  if (!code) { toast('동기화 코드를 입력해주세요'); return; }
-  if (_unsub) { _unsub(); _unsub = null; }
-  _syncCode = code;
-  localStorage.setItem('haeyaji_sync_code', code);
-  closeOv();
-  toast('☁️ 동기화를 시작할게요!');
-  initSync();
-}
-
-function disconnectSync() {
-  if (!confirm('동기화 연결을 해제할까요?\n데이터는 이 기기에 그대로 남아요.')) return;
-  if (_unsub) { _unsub(); _unsub = null; }
-  localStorage.removeItem('haeyaji_sync_code');
-  _syncCode = null;
-  closeOv();
-  setSyncStatus('off');
-  toast('동기화 연결을 해제했어요');
 }
 
 /* ============================================================
