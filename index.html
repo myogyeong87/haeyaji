@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>해야지</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<style>
+:root {
+  --bg: #F8F9FA;
+  --card: #FFFFFF;
+  --main: #4A6FA5;
+  --accent: #E8704A;
+  --text: #2D3436;
+  --sub: #A0A8B0;
+  --border: #E9ECEF;
+  --shadow: 0 2px 8px rgba(0,0,0,0.07);
+  --r: 12px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', 'Pretendard', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ── LAYOUT ── */
+.app { display: flex; height: 100vh; overflow: hidden; }
+
+.sidebar {
+  width: 224px; min-width: 224px;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  padding: 28px 0 20px;
+}
+.logo {
+  padding: 0 24px 14px;
+  font-size: 21px; font-weight: 800;
+  color: var(--main); letter-spacing: -1px;
+  display: flex; align-items: center; gap: 10px;
+}
+.logo-mark {
+  width: 32px; height: 32px;
+  background: var(--main); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; flex-shrink: 0;
+}
+
+/* Search */
+.sidebar-search { padding: 0 16px 14px; }
+.search-wrap { position: relative; }
+.search-wrap .s-ic {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%); color: var(--sub); pointer-events: none;
+}
+.search-inp {
+  width: 100%; padding: 8px 28px 8px 32px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; color: var(--text);
+  background: var(--bg); font-family: inherit;
+  transition: border-color .15s, background .15s;
+}
+.search-inp:focus { outline: none; border-color: var(--main); background: #fff; }
+.search-inp::placeholder { color: var(--sub); }
+.search-clear {
+  position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%);
+  background: none; border: none; cursor: pointer;
+  color: var(--sub); display: none; padding: 2px;
+  font-size: 13px; line-height: 1;
+}
+.search-clear.show { display: block; }
+
+.mob-search { display: none; padding: 12px 16px 0; }
+@media (max-width: 768px) { .mob-search { display: block; } }
+
+.sidebar-nav { flex: 1; }
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 12px 24px;
+  cursor: pointer; color: var(--sub);
+  font-size: 14px; font-weight: 500;
+  transition: all .15s; position: relative;
+  user-select: none;
+}
+.nav-item:hover { background: #F0F4F9; color: var(--text); }
+.nav-item.active { color: var(--main); background: #EEF3FA; font-weight: 700; }
+.nav-item.active::before {
+  content: '';
+  position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; background: var(--main); border-radius: 0 2px 2px 0;
+}
+.sidebar-footer {
+  padding: 16px 24px 0;
+  font-size: 12px; color: var(--sub);
+  border-top: 1px solid var(--border);
+}
+
+.content { flex: 1; overflow-y: auto; padding: 32px 36px; }
+
+.bottom-tabs {
+  display: none;
+  position: fixed; bottom: 0; left: 0; right: 0;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  z-index: 100;
+}
+.tab-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; padding: 10px 0 13px;
+  cursor: pointer; color: var(--sub);
+  font-size: 11px; gap: 4px;
+  transition: color .15s; user-select: none;
+}
+.tab-item.active { color: var(--main); }
+
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .bottom-tabs { display: flex; }
+  .content { padding: 12px 16px 88px; }
+}
+
+/* ── PAGES ── */
+.page { display: none; }
+.page.active { display: block; }
+
+.ph { margin-bottom: 24px; }
+.ph-row {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap; gap: 12px;
+}
+.pt { font-size: 24px; font-weight: 800; letter-spacing: -.5px; }
+.ps { font-size: 14px; color: var(--sub); margin-top: 4px; }
+
+/* ── STATS ── */
+.stats { display: flex; gap: 14px; margin-bottom: 28px; }
+.stat {
+  flex: 1; background: var(--card);
+  border-radius: var(--r);
+  padding: 16px 20px;
+  box-shadow: var(--shadow);
+}
+.stat-n { font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -1px; margin-bottom: 4px; }
+.stat-l { font-size: 12px; color: var(--sub); }
+
+/* ── TODO CARD ── */
+.card {
+  background: var(--card); border-radius: var(--r);
+  padding: 14px 16px; margin-bottom: 8px;
+  box-shadow: var(--shadow);
+  display: flex; align-items: flex-start; gap: 12px;
+  transition: box-shadow .15s;
+}
+.card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.1); }
+.card.done .ctitle { text-decoration: line-through; color: var(--sub); }
+.card.starred { border-left: 3px solid #E53935; background: #FFF5F5; }
+
+.cbody { flex: 1; min-width: 0; }
+.cbadge-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 5px; }
+.cbadge {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+.ctitle { font-size: 15px; font-weight: 500; line-height: 1.4; margin-bottom: 3px; word-break: break-word; }
+.cmemo { font-size: 13px; color: var(--sub); line-height: 1.4; margin-bottom: 3px; word-break: break-word; }
+.cdate {
+  display: flex; align-items: center;
+  gap: 4px; font-size: 12px; color: var(--sub);
+  margin-top: 2px; flex-wrap: wrap;
+}
+.cdone-meta { font-size: 11px; color: var(--sub); margin-top: 3px; }
+
+/* D-day badge */
+.dday {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+  background: var(--bg); color: var(--sub);
+}
+.dday.urgent { background: #FFF0EB; color: var(--accent); }
+
+/* Priority badge */
+.pri-badge {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 7px; border-radius: 20px;
+  font-size: 11px; font-weight: 700;
+}
+
+.cactions { display: flex; gap: 4px; flex-shrink: 0; flex-direction: column; }
+@media (min-width: 480px) { .cactions { flex-direction: row; } }
+
+.abtn {
+  width: 30px; height: 30px;
+  border: none; border-radius: 7px;
+  background: var(--bg); color: var(--sub);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s; flex-shrink: 0;
+}
+.abtn.check:hover { background: #E8F5E9; color: #43A047; }
+.abtn.cal:hover   { background: #EEF3FA; color: var(--main); }
+.abtn.ret:hover   { background: #FFF3E0; color: #FB8C00; }
+.abtn.edit:hover  { background: #EEF3FA; color: var(--main); }
+.abtn.del:hover   { background: #FFEBEE; color: #E53935; }
+.abtn.undo:hover  { background: #FFF3E0; color: #FB8C00; }
+.abtn.star        { color: var(--sub); }
+.abtn.star:hover  { background: #FFEBEE; color: #E53935; }
+.abtn.star.on     { color: #E53935; background: #FFEBEE; }
+
+/* ── CALENDAR ── */
+.cal-wrap { background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); overflow: hidden; }
+.cal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.cal-title { font-size: 18px; font-weight: 800; letter-spacing: -.3px; }
+.cal-nav { display: flex; gap: 4px; }
+.cal-nav-btn {
+  width: 32px; height: 32px; border: none; border-radius: 8px;
+  background: var(--bg); color: var(--text); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.cal-nav-btn:hover { background: var(--border); }
+.cal-grid { padding: 10px 14px 14px; }
+.cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 2px; }
+.cal-dow-cell {
+  text-align: center; font-size: 11px; font-weight: 700;
+  color: var(--sub); padding: 6px 0; letter-spacing: .4px;
+}
+.cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-day {
+  min-height: 48px; padding: 6px 2px 4px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-start;
+  border-radius: 8px; cursor: pointer;
+  user-select: none; transition: background .15s;
+}
+.cal-day:hover:not(.today) { background: var(--bg); }
+.cal-day.today { background: var(--main); color: #fff; }
+.cal-day.today:hover { background: #3a5f95; }
+.cal-day.sel:not(.today) { background: #EEF3FA; color: var(--main); font-weight: 700; }
+.cal-day.other { opacity: .4; pointer-events: none; }
+.cal-day-n { font-size: 14px; font-weight: 500; line-height: 1; }
+.cal-dots { display: flex; gap: 2px; margin-top: 4px; }
+.cal-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.cal-day.today .cal-dot { background: rgba(255,255,255,.8); }
+.cal-detail { padding: 16px 20px; border-top: 1px solid var(--border); }
+.cal-detail-hd {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  margin-bottom: 12px; display: flex; align-items: center;
+  justify-content: space-between;
+}
+.cal-detail-date { font-size: 13px; color: var(--sub); font-weight: 500; }
+
+/* ── CATEGORY SECTION ── */
+.cat-sec { margin-bottom: 28px; }
+.cat-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px; padding: 0 2px;
+}
+.cat-name { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+.cat-cnt {
+  font-size: 11px; font-weight: 600;
+  background: var(--bg); color: var(--sub);
+  padding: 2px 7px; border-radius: 20px;
+}
+.cat-acts { display: flex; gap: 6px; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 8px 16px; border-radius: 8px;
+  border: none; cursor: pointer;
+  font-size: 13px; font-weight: 600;
+  transition: all .15s; font-family: inherit; user-select: none;
+}
+.btn-p { background: var(--main); color: #fff; }
+.btn-p:hover { background: #3a5f95; }
+.btn-g { background: transparent; color: var(--sub); border: 1.5px solid var(--border); }
+.btn-g:hover { background: var(--bg); color: var(--text); }
+.btn-d { background: transparent; color: var(--accent); border: 1.5px solid var(--border); }
+.btn-d:hover { background: #FFF0EB; border-color: var(--accent); }
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+.add-btn {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 10px 14px;
+  border: 2px dashed var(--border);
+  border-radius: 10px; background: transparent;
+  color: var(--sub); font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+  font-family: inherit; margin-top: 6px;
+}
+.add-btn:hover { border-color: var(--main); color: var(--main); background: #F0F5FF; }
+
+/* ── EMPTY ── */
+.empty { text-align: center; padding: 48px 24px; color: var(--sub); }
+.empty-ic { margin-bottom: 16px; opacity: .35; }
+.empty-t { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.empty-s { font-size: 13px; }
+.cat-empty {
+  text-align: center; padding: 14px;
+  border: 1.5px dashed var(--border);
+  border-radius: 8px; font-size: 13px; color: var(--sub);
+}
+
+/* ── GROUP HEADER ── */
+.ghd {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+  text-transform: uppercase; letter-spacing: .8px;
+  padding: 8px 0 10px; margin-top: 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 8px;
+}
+.ghd:first-child { margin-top: 0; }
+
+/* ── TOGGLE ── */
+.tog-g { display: flex; background: var(--bg); border-radius: 8px; padding: 3px; }
+.tog-b {
+  flex: 1; padding: 6px 10px;
+  border: none; border-radius: 6px;
+  background: transparent; color: var(--sub);
+  font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all .15s;
+  font-family: inherit; white-space: nowrap;
+}
+.tog-b.active {
+  background: var(--card); color: var(--main);
+  font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+
+/* ── MODAL ── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center;
+  justify-content: center; z-index: 1000;
+  padding: 16px; backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--card); border-radius: 16px;
+  padding: 26px; width: 100%; max-width: 480px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  animation: mIn .18s ease;
+  max-height: 90vh; overflow-y: auto;
+}
+@keyframes mIn {
+  from { opacity: 0; transform: scale(.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.mtitle { font-size: 18px; font-weight: 800; margin-bottom: 22px; letter-spacing: -.3px; }
+.fg { margin-bottom: 16px; }
+.fl {
+  display: block; font-size: 11px; font-weight: 700;
+  color: var(--sub); text-transform: uppercase;
+  letter-spacing: .8px; margin-bottom: 6px;
+}
+.fi, .fs, .fta {
+  width: 100%; padding: 10px 14px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 14px; color: var(--text);
+  background: var(--bg);
+  transition: border-color .15s, background .15s;
+  font-family: inherit; -webkit-appearance: none; appearance: none;
+}
+.fi:focus, .fs:focus, .fta:focus { outline: none; border-color: var(--main); background: #fff; }
+.fta { resize: vertical; min-height: 80px; line-height: 1.5; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.sw { width: 32px; height: 32px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: all .15s; }
+.sw.sel { border-color: var(--text); transform: scale(1.18); }
+.mfoot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px; }
+
+/* Priority options */
+.pri-opts { display: flex; gap: 8px; }
+.pri-opt {
+  flex: 1; padding: 8px 6px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--bg); cursor: pointer;
+  text-align: center; font-size: 12px; font-weight: 600;
+  transition: all .15s; user-select: none;
+}
+.pri-opt.sel { border-color: var(--main); background: #EEF3FA; color: var(--main); }
+
+/* ── SEARCH RESULTS ── */
+.search-sec { margin-bottom: 24px; }
+.search-sec-hd {
+  font-size: 12px; font-weight: 700; color: var(--sub);
+  text-transform: uppercase; letter-spacing: .8px;
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+
+/* ── TOAST ── */
+.toasts {
+  position: fixed; bottom: 90px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000; display: flex;
+  flex-direction: column; gap: 8px; align-items: center;
+}
+@media (min-width: 769px) { .toasts { bottom: 24px; } }
+.toast {
+  background: #2D3436; color: #fff;
+  padding: 11px 18px; border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  white-space: nowrap;
+  animation: tin .2s ease;
+  box-shadow: 0 4px 14px rgba(0,0,0,.22);
+}
+@keyframes tin {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── MISC ── */
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #DDE1E5; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #C0C8D0; }
+.mob-footer { display: none; text-align: center; padding: 20px 0 4px; font-size: 12px; color: var(--sub); }
+@media (max-width: 768px) { .mob-footer { display: block; } }
+
+/* ── SYNC ── */
+.sidebar-footer { display: flex; flex-direction: column; gap: 8px; }
+.sync-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--sub); display: flex; align-items: center; gap: 6px;
+  font-size: 12px; padding: 0; font-family: inherit;
+  transition: color .15s;
+}
+.sync-btn:hover { color: var(--text); }
+.sync-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border); flex-shrink: 0;
+}
+.sync-dot.ok      { background: #43A047; }
+.sync-dot.syncing { background: #F9A825; animation: sdPulse .9s infinite; }
+.sync-dot.error   { background: #E53935; }
+@keyframes sdPulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-mark"><i data-lucide="check" size="18"></i></div>
+    해야지
+  </div>
+  <div class="sidebar-search">
+    <div class="search-wrap">
+      <i data-lucide="search" size="14" class="s-ic"></i>
+      <input class="search-inp" id="search-inp" placeholder="검색..." oninput="onSearch(this.value)">
+      <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" data-tab="today" onclick="go('today')">
+      <i data-lucide="home" size="17"></i> 오늘
+    </div>
+    <div class="nav-item" data-tab="cal" onclick="go('cal')">
+      <i data-lucide="calendar-days" size="17"></i> 달력
+    </div>
+    <div class="nav-item" data-tab="cabinet" onclick="go('cabinet')">
+      <i data-lucide="folder" size="17"></i> 보관함
+    </div>
+    <div class="nav-item" data-tab="done" onclick="go('done')">
+      <i data-lucide="check-circle-2" size="17"></i> 완료함
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div>made by 키키쌤 🧙‍♀️</div>
+    <button class="sync-btn" onclick="openSyncModal()">
+      <span class="sync-dot" id="sync-dot"></span>
+      <span id="sync-label">동기화 설정</span>
+    </button>
+  </div>
+</aside>
+
+<!-- CONTENT -->
+<main class="content">
+
+  <div class="mob-search">
+    <div class="search-wrap">
+      <i data-lucide="search" size="14" class="s-ic"></i>
+      <input class="search-inp" id="search-inp-mob" placeholder="검색..." oninput="onSearch(this.value)">
+      <button class="search-clear" id="search-clear-mob" onclick="clearSearch()">✕</button>
+    </div>
+  </div>
+
+  <!-- SEARCH RESULTS -->
+  <div id="pg-search" class="page" style="margin-top:16px"></div>
+
+  <!-- TODAY -->
+  <div id="pg-today" class="page active">
+    <div class="ph">
+      <div class="pt">오늘</div>
+      <div class="ps" id="today-sub"></div>
+    </div>
+    <div class="stats" id="today-stats"></div>
+    <div id="today-body"></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div id="pg-cal" class="page">
+    <div class="ph">
+      <div class="pt">달력</div>
+      <div class="ps">날짜별 할 일을 확인해요</div>
+    </div>
+    <div id="cal-body"></div>
+  </div>
+
+  <!-- CABINET (보관함) -->
+  <div id="pg-cabinet" class="page">
+    <div class="ph">
+      <div class="ph-row">
+        <div>
+          <div class="pt">보관함</div>
+          <div class="ps" id="cabinet-sub">카테고리별로 할 일을 관리해요</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="tog-g">
+            <button class="tog-b active" id="tog-cab-cat"  onclick="setCabinetView('cat')">카테고리별</button>
+            <button class="tog-b"        id="tog-cab-date" onclick="setCabinetView('date')">날짜별</button>
+          </div>
+          <button class="btn btn-p" id="btn-add-cat" onclick="openCatModal()">
+            <i data-lucide="plus" size="14"></i> 카테고리 추가
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="cabinet-body"></div>
+  </div>
+
+  <!-- DONE (완료함) -->
+  <div id="pg-done" class="page">
+    <div class="ph">
+      <div class="ph-row">
+        <div>
+          <div class="pt">완료함</div>
+          <div class="ps">완료한 일들을 돌아봐요</div>
+        </div>
+        <div class="tog-g">
+          <button class="tog-b active" id="tog-date" onclick="setDoneView('date')">날짜별</button>
+          <button class="tog-b" id="tog-cat"  onclick="setDoneView('cat')">카테고리별</button>
+          <button class="tog-b" id="tog-dcal" onclick="setDoneView('cal')">달력</button>
+        </div>
+      </div>
+    </div>
+    <div id="done-body"></div>
+  </div>
+
+  <div class="mob-footer">
+    made by 키키쌤 🧙‍♀️
+    <div style="margin-top:6px">
+      <button class="sync-btn" style="display:inline-flex" onclick="openSyncModal()">
+        <span class="sync-dot" id="sync-dot-mob"></span>
+        <span id="sync-label-mob">동기화 설정</span>
+      </button>
+    </div>
+  </div>
+</main>
+
+<!-- BOTTOM TABS -->
+<nav class="bottom-tabs">
+  <div class="tab-item active" data-tab="today" onclick="go('today')">
+    <i data-lucide="home" size="21"></i><span>오늘</span>
+  </div>
+  <div class="tab-item" data-tab="cal" onclick="go('cal')">
+    <i data-lucide="calendar-days" size="21"></i><span>달력</span>
+  </div>
+  <div class="tab-item" data-tab="cabinet" onclick="go('cabinet')">
+    <i data-lucide="folder" size="21"></i><span>보관함</span>
+  </div>
+  <div class="tab-item" data-tab="done" onclick="go('done')">
+    <i data-lucide="check-circle-2" size="21"></i><span>완료함</span>
+  </div>
+</nav>
+
+</div><!-- .app -->
+
+<div id="overlay" class="overlay" style="display:none" onclick="onOvClick(event)">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+/* ============================================================
+   DATA & MIGRATION
+   ============================================================ */
+const KEY_V2 = 'haeyaji_v2';
+const KEY_V1 = 'haeyaji_v1';
+
+function migrate(d) {
+  d.todos = (d.todos || []).map(t => ({
+    star: false,
+    priority: 'normal',
+    ...t
+  }));
+  return d;
+}
+
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY_V2));
+    if (d && Array.isArray(d.cats) && Array.isArray(d.todos)) return migrate(d);
+  } catch(e) {}
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY_V1));
+    if (d && Array.isArray(d.cats) && Array.isArray(d.todos)) {
+      const m = migrate(d);
+      localStorage.setItem(KEY_V2, JSON.stringify(m));
+      return m;
+    }
+  } catch(e) {}
+  return {
+    cats: [
+      { id: 'c1', name: '업무', color: '#4A6FA5' },
+      { id: 'c2', name: '개인', color: '#E8704A' },
+      { id: 'c3', name: '공부', color: '#6C8E5A' },
+    ],
+    todos: []
+  };
+}
+
+let db = load();
+function save() {
+  localStorage.setItem(KEY_V2, JSON.stringify(db));
+  pushToCloud();
+}
+
+/* ============================================================
+   UTILS
+   ============================================================ */
+const uid    = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const today  = () => new Date().toISOString().slice(0,10);
+const catObj = id => db.cats.find(c => c.id === id) || null;
+const DAYS_KO = ['일','월','화','수','목','금','토'];
+
+function fmtFull(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return `${dt.getFullYear()}년 ${dt.getMonth()+1}월 ${dt.getDate()}일 (${DAYS_KO[dt.getDay()]})`;
+}
+function fmtShort(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return `${dt.getMonth()+1}/${dt.getDate()} (${DAYS_KO[dt.getDay()]})`;
+}
+function esc(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function toast(msg, ms=2200) {
+  const el = document.createElement('div');
+  el.className = 'toast'; el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+const icons = () => lucide.createIcons();
+
+/* D-day */
+function ddayHtml(dateStr) {
+  if (!dateStr) return '';
+  const t   = new Date(today() + 'T00:00:00');
+  const d   = new Date(dateStr + 'T00:00:00');
+  const diff = Math.round((d - t) / 86400000);
+  let label, urgent;
+  if (diff === 0)      { label = 'D-day'; urgent = true; }
+  else if (diff > 0)   { label = `D-${diff}`;       urgent = diff <= 1; }
+  else                 { label = `D+${-diff}`;       urgent = false; }
+  return `<span class="dday${urgent?' urgent':''}">${label}</span>`;
+}
+
+/* Priority */
+const PRI = {
+  urgent: { label: '긴급', emoji: '🔴', color: '#E53935', bg: '#FFEBEE' },
+  normal: { label: '보통', emoji: '🟡', color: '#F9A825', bg: '#FFF8E1' },
+  easy:   { label: '여유', emoji: '🟢', color: '#43A047', bg: '#E8F5E9' },
+};
+function priOrder(t) {
+  if (t.star) return 0;
+  if (t.priority === 'urgent') return 1;
+  if (t.priority === 'normal') return 2;
+  if (t.priority === 'easy')   return 3;
+  return 4;
+}
+function priBadge(priority) {
+  if (!priority || priority === 'normal') return '';
+  const p = PRI[priority]; if (!p) return '';
+  return `<span class="pri-badge" style="background:${p.bg};color:${p.color}">${p.emoji} ${p.label}</span>`;
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+let curTab   = 'today';
+let doneView = 'date';
+let searchQ  = '';
+
+function go(tab) {
+  curTab = tab; searchQ = '';
+  ['search-inp','search-inp-mob'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['search-clear','search-clear-mob'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.classList.remove('show');
+  });
+  document.querySelectorAll('.page').forEach(p =>
+    p.classList.toggle('active', p.id === 'pg-' + tab));
+  document.getElementById('pg-search').classList.remove('active');
+  document.querySelectorAll('[data-tab]').forEach(el =>
+    el.classList.toggle('active', el.dataset.tab === tab));
+  render();
+}
+
+function render() {
+  if      (curTab === 'today')   renderToday();
+  else if (curTab === 'cal')     renderCal();
+  else if (curTab === 'cabinet') renderCabinet();
+  else if (curTab === 'done')    renderDone();
+  icons();
+}
+
+/* ============================================================
+   SEARCH
+   ============================================================ */
+function onSearch(q) {
+  searchQ = q.trim();
+  ['search-inp','search-inp-mob'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = q;
+  });
+  ['search-clear','search-clear-mob'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('show', !!searchQ);
+  });
+  if (searchQ) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('pg-search').classList.add('active');
+    renderSearch();
+  } else {
+    document.getElementById('pg-search').classList.remove('active');
+    document.getElementById('pg-' + curTab).classList.add('active');
+    render();
+  }
+  icons();
+}
+function clearSearch() { onSearch(''); }
+
+function renderSearch() {
+  const q = searchQ.toLowerCase();
+  const hit = t => t.title.toLowerCase().includes(q) || (t.memo && t.memo.toLowerCase().includes(q));
+  const pending = db.todos.filter(t => !t.done && hit(t));
+  const dones   = db.todos.filter(t =>  t.done && hit(t));
+
+  let html = `<div class="ph"><div class="pt">검색</div><div class="ps">"${esc(searchQ)}" 검색 결과</div></div>`;
+
+  if (!pending.length && !dones.length) {
+    html += `<div class="empty">
+      <div class="empty-ic"><i data-lucide="search-x" size="52"></i></div>
+      <div class="empty-t">검색 결과가 없어요</div>
+      <div class="empty-s">다른 키워드로 검색해보세요</div>
+    </div>`;
+  } else {
+    if (pending.length) {
+      html += `<div class="search-sec">
+        <div class="search-sec-hd"><i data-lucide="list-todo" size="13"></i> 진행 중 (${pending.length})</div>
+        ${pending.map(t => {
+          const c = catObj(t.catId);
+          const cn = c ? c.name : '미분류'; const cc = c ? c.color : '#A0A8B0';
+          return `<div class="card${t.star?' starred':''}">
+            <div class="cbody">
+              <div class="cbadge-row">
+                <span class="cbadge" style="background:${cc}22;color:${cc}">${esc(cn)}</span>
+                ${priBadge(t.priority)}
+              </div>
+              <div class="ctitle">${esc(t.title)}</div>
+              ${t.memo ? `<div class="cmemo">${esc(t.memo)}</div>` : ''}
+              ${t.date ? `<div class="cdate"><i data-lucide="calendar" size="11"></i>${fmtShort(t.date)}${ddayHtml(t.date)}</div>` : ''}
+            </div>
+            <div class="cactions">
+              <button class="abtn edit" title="수정" onclick="openTodoModal('${t.id}','${t.catId}')"><i data-lucide="pencil" size="14"></i></button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+    if (dones.length) {
+      html += `<div class="search-sec">
+        <div class="search-sec-hd"><i data-lucide="check-circle-2" size="13"></i> 완료함 (${dones.length})</div>
+        ${dones.map(t => doneCard(t)).join('')}
+      </div>`;
+    }
+  }
+  document.getElementById('pg-search').innerHTML = html;
+}
+
+/* ============================================================
+   TODAY
+   ============================================================ */
+function renderToday() {
+  const t = today();
+  document.getElementById('today-sub').textContent = fmtFull(t);
+
+  let pending = db.todos.filter(x => x.date === t && !x.done);
+  pending.sort((a, b) => priOrder(a) - priOrder(b));
+  const doneToday = db.todos.filter(x => x.doneAt === t);
+
+  document.getElementById('today-stats').innerHTML = `
+    <div class="stat">
+      <div class="stat-n" style="color:var(--main)">${pending.length}</div>
+      <div class="stat-l">남은 할 일</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" style="color:var(--accent)">${doneToday.length}</div>
+      <div class="stat-l">오늘 완료</div>
+    </div>`;
+
+  if (!pending.length) {
+    document.getElementById('today-body').innerHTML = `
+      <div class="empty">
+        <div class="empty-ic"><i data-lucide="sun" size="52"></i></div>
+        <div class="empty-t">오늘 할 일이 없어요!</div>
+        <div class="empty-s">여유로운 하루를 즐기세요 ☀️</div>
+      </div>`;
+    return;
+  }
+  document.getElementById('today-body').innerHTML = pending.map(todayCard).join('');
+}
+
+function todayCard(todo) {
+  const c = catObj(todo.catId);
+  const cn = c ? c.name : '미분류'; const cc = c ? c.color : '#A0A8B0';
+  return `<div class="card${todo.star?' starred':''}">
+    <div class="cbody">
+      <div class="cbadge-row">
+        <span class="cbadge" style="background:${cc}22;color:${cc}">${esc(cn)}</span>
+        ${priBadge(todo.priority)}
+      </div>
+      <div class="ctitle">${esc(todo.title)}</div>
+      ${todo.memo ? `<div class="cmemo">${esc(todo.memo)}</div>` : ''}
+    </div>
+    <div class="cactions">
+      <button class="abtn star${todo.star?' on':''}" title="${todo.star?'별 해제':'오늘의 별'}" onclick="toggleStar('${todo.id}')"><i data-lucide="star" size="14"></i></button>
+      <button class="abtn check" title="완료" onclick="doComplete('${todo.id}')"><i data-lucide="check" size="14"></i></button>
+      <button class="abtn cal"   title="날짜 변경" onclick="openDateModal('${todo.id}')"><i data-lucide="calendar" size="14"></i></button>
+      <button class="abtn ret"   title="보관함으로" onclick="doReturn('${todo.id}')"><i data-lucide="undo-2" size="14"></i></button>
+    </div>
+  </div>`;
+}
+
+function toggleStar(id) {
+  const t = db.todos.find(x => x.id === id); if (!t) return;
+  t.star = !t.star;
+  save(); render();
+  toast(t.star ? '⭐ 오늘의 별로 지정했어요!' : '별을 해제했어요');
+}
+
+function doComplete(id) {
+  const t = db.todos.find(x => x.id === id); if (!t) return;
+  t.done = true; t.doneAt = today();
+  save(); toast('✅ 완료했어요!'); render();
+}
+
+function doReturn(id) {
+  const t = db.todos.find(x => x.id === id); if (!t) return;
+  t.date = null;
+  save(); toast('↩ 보관함으로 돌아갔어요'); render();
+}
+
+/* ============================================================
+   CALENDAR TAB
+   ============================================================ */
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calSelDay = null;
+
+function renderCal() {
+  document.getElementById('cal-body').innerHTML = buildCalHtml(calYear, calMonth, calSelDay, false);
+}
+
+function calNav(delta) {
+  calMonth += delta;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  calSelDay = null;
+  renderCal(); icons();
+}
+function calClick(ds) {
+  calSelDay = calSelDay === ds ? null : ds;
+  renderCal(); icons();
+}
+
+/* ============================================================
+   DONE CALENDAR
+   ============================================================ */
+let donCalYear = new Date().getFullYear();
+let donCalMonth = new Date().getMonth();
+let donCalSelDay = null;
+
+function donCalNav(delta) {
+  donCalMonth += delta;
+  if (donCalMonth > 11) { donCalMonth = 0; donCalYear++; }
+  if (donCalMonth < 0)  { donCalMonth = 11; donCalYear--; }
+  donCalSelDay = null;
+  renderDone(); icons();
+}
+function donCalClick(ds) {
+  donCalSelDay = donCalSelDay === ds ? null : ds;
+  renderDone(); icons();
+}
+
+/* ============================================================
+   SHARED CALENDAR BUILDER
+   ============================================================ */
+function buildCalHtml(year, month, selDay, forDone) {
+  const t = today();
+  const navFn   = forDone ? 'donCalNav'   : 'calNav';
+  const clickFn = forDone ? 'donCalClick' : 'calClick';
+  const dateField = forDone ? 'doneAt' : 'date';
+  const pool = forDone ? db.todos.filter(x => x.done) : db.todos.filter(x => !x.done);
+
+  const dotDates = new Set();
+  pool.forEach(todo => {
+    const d = todo[dateField];
+    if (d && d.startsWith(`${year}-${String(month+1).padStart(2,'0')}`)) dotDates.add(d);
+  });
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrev  = new Date(year, month, 0).getDate();
+
+  let html = `<div class="cal-wrap">
+    <div class="cal-head">
+      <div class="cal-title">${year}년 ${month+1}월</div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="${navFn}(-1)"><i data-lucide="chevron-left" size="16"></i></button>
+        <button class="cal-nav-btn" onclick="${navFn}(1)"><i data-lucide="chevron-right" size="16"></i></button>
+      </div>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-dow">${DAYS_KO.map(d=>`<div class="cal-dow-cell">${d}</div>`).join('')}</div>
+      <div class="cal-days">`;
+
+  for (let i = firstDay - 1; i >= 0; i--)
+    html += `<div class="cal-day other"><span class="cal-day-n">${daysInPrev - i}</span></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = ds === t;
+    const isSel   = ds === selDay;
+    const hasDot  = dotDates.has(ds);
+    let cls = 'cal-day';
+    if (isToday) cls += ' today';
+    else if (isSel) cls += ' sel';
+    html += `<div class="${cls}" onclick="${clickFn}('${ds}')">
+      <span class="cal-day-n">${d}</span>
+      ${hasDot ? '<div class="cal-dots"><div class="cal-dot"></div></div>' : '<div style="height:9px"></div>'}
+    </div>`;
+  }
+
+  const total = firstDay + daysInMonth;
+  const rem   = total % 7 ? 7 - (total % 7) : 0;
+  for (let d = 1; d <= rem; d++)
+    html += `<div class="cal-day other"><span class="cal-day-n">${d}</span></div>`;
+
+  html += `</div></div>`;
+
+  if (selDay) {
+    const dayPool = forDone
+      ? db.todos.filter(x => x.doneAt === selDay)
+      : db.todos.filter(x => x.date === selDay && !x.done);
+    html += `<div class="cal-detail">
+      <div class="cal-detail-hd">
+        <span>${fmtFull(selDay)}</span>
+        <span class="cal-detail-date">${dayPool.length}개</span>
+      </div>`;
+    if (!dayPool.length) {
+      html += `<div class="cat-empty">${forDone ? '완료한 일이 없어요' : '할 일이 없어요'}</div>`;
+    } else if (forDone) {
+      html += dayPool.map(t => doneCard(t)).join('');
+    } else {
+      html += dayPool.sort((a,b) => priOrder(a)-priOrder(b)).map(t => cabCard(t, catObj(t.catId))).join('');
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
+/* ============================================================
+   CABINET (보관함)
+   ============================================================ */
+let cabinetView = 'cat';
+
+function setCabinetView(v) {
+  cabinetView = v;
+  document.getElementById('tog-cab-cat').classList.toggle('active',  v === 'cat');
+  document.getElementById('tog-cab-date').classList.toggle('active', v === 'date');
+  document.getElementById('cabinet-sub').textContent =
+    v === 'cat' ? '카테고리별로 할 일을 관리해요' : '날짜별로 할 일을 확인해요';
+  document.getElementById('btn-add-cat').style.display = v === 'cat' ? '' : 'none';
+  renderCabinet(); icons();
+}
+
+function renderCabinetDate() {
+  const t = today();
+  const todos = db.todos.filter(x => !x.done);
+
+  if (!todos.length) {
+    document.getElementById('cabinet-body').innerHTML = `
+      <div class="empty">
+        <div class="empty-ic"><i data-lucide="inbox" size="52"></i></div>
+        <div class="empty-t">할 일이 없어요</div>
+        <div class="empty-s">보관함 탭에서 카테고리를 추가하고 할 일을 넣어보세요</div>
+      </div>`;
+    return;
+  }
+
+  const grp = {};
+  todos.forEach(todo => { (grp[todo.date || '__none__'] ||= []).push(todo); });
+
+  const keys   = Object.keys(grp);
+  const past   = keys.filter(k => k !== '__none__' && k < t).sort();
+  const todayK = keys.includes(t) ? [t] : [];
+  const future = keys.filter(k => k !== '__none__' && k > t).sort();
+  const none   = keys.includes('__none__') ? ['__none__'] : [];
+  const sorted = [...past, ...todayK, ...future, ...none];
+
+  let html = '';
+  sorted.forEach(key => {
+    const group = grp[key].slice().sort((a, b) => priOrder(a) - priOrder(b));
+    let lbl;
+    if (key === '__none__') {
+      lbl = '날짜 없음';
+    } else if (key === t) {
+      lbl = `오늘 · ${fmtFull(key)}`;
+    } else if (key < t) {
+      lbl = `<span style="color:var(--accent)">${fmtFull(key)} · 기한 지남</span>`;
+    } else {
+      lbl = fmtFull(key);
+    }
+    html += `<div class="ghd">${lbl}</div>`;
+    html += group.map(todo => cabCard(todo, catObj(todo.catId))).join('');
+  });
+
+  document.getElementById('cabinet-body').innerHTML = html;
+}
+
+function renderCabinet() {
+  if (cabinetView === 'date') { renderCabinetDate(); return; }
+  if (!db.cats.length) {
+    document.getElementById('cabinet-body').innerHTML = `
+      <div class="empty">
+        <div class="empty-ic"><i data-lucide="folder-plus" size="52"></i></div>
+        <div class="empty-t">카테고리가 없어요</div>
+        <div class="empty-s">상단 버튼으로 카테고리를 추가해보세요</div>
+      </div>`;
+    return;
+  }
+  document.getElementById('cabinet-body').innerHTML = db.cats.map(c => {
+    const todos = db.todos.filter(t => t.catId === c.id && !t.done);
+    return `<div class="cat-sec">
+      <div class="cat-hd">
+        <div class="cat-name">
+          <span class="dot" style="background:${c.color}"></span>
+          ${esc(c.name)}
+          <span class="cat-cnt">${todos.length}</span>
+        </div>
+        <div class="cat-acts">
+          <button class="btn btn-g btn-sm" onclick="openTodoModal(null,'${c.id}')">
+            <i data-lucide="plus" size="13"></i> 추가
+          </button>
+          <button class="btn btn-d btn-sm" onclick="delCat('${c.id}')">
+            <i data-lucide="trash-2" size="13"></i>
+          </button>
+        </div>
+      </div>
+      <div>${todos.length
+        ? todos.map(t => cabCard(t, c)).join('')
+        : '<div class="cat-empty">아직 할 일이 없어요</div>'
+      }</div>
+      <button class="add-btn" onclick="openTodoModal(null,'${c.id}')">
+        <i data-lucide="plus" size="14"></i> 할 일 추가
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function cabCard(todo, c) {
+  const t  = today();
+  const cc = (c && c.color) ? c.color : '#A0A8B0';
+  const cn = (c && c.name)  ? c.name  : '미분류';
+  let dateTxt;
+  if (!todo.date)         dateTxt = `<span style="color:var(--sub)">날짜 없음</span>`;
+  else if (todo.date===t) dateTxt = `<span style="color:var(--main);font-weight:700">오늘</span>`;
+  else if (todo.date < t) dateTxt = `<span style="color:var(--accent)">${fmtShort(todo.date)}</span>`;
+  else                    dateTxt = `<span style="color:var(--sub)">${fmtShort(todo.date)}</span>`;
+  return `<div class="card">
+    <div class="cbody">
+      <div class="cbadge-row">${priBadge(todo.priority)}</div>
+      <div class="ctitle">${esc(todo.title)}</div>
+      ${todo.memo ? `<div class="cmemo">${esc(todo.memo)}</div>` : ''}
+      <div class="cdate">
+        <i data-lucide="calendar" size="11"></i>${dateTxt}${ddayHtml(todo.date)}
+      </div>
+    </div>
+    <div class="cactions">
+      <button class="abtn check" title="완료" onclick="completeCab('${todo.id}')"><i data-lucide="check" size="14"></i></button>
+      <button class="abtn edit"  title="수정"  onclick="openTodoModal('${todo.id}','${todo.catId}')"><i data-lucide="pencil" size="14"></i></button>
+      <button class="abtn del"   title="삭제"  onclick="delTodo('${todo.id}')"><i data-lucide="trash-2" size="14"></i></button>
+    </div>
+  </div>`;
+}
+
+function completeCab(id) {
+  const t = db.todos.find(x => x.id === id); if (!t) return;
+  t.done = true; t.doneAt = today();
+  save(); toast('✅ 완료했어요!'); render();
+}
+
+function delTodo(id) {
+  if (!confirm('정말 삭제할까요?')) return;
+  db.todos = db.todos.filter(t => t.id !== id);
+  save(); toast('🗑 삭제했어요'); render();
+}
+
+function delCat(id) {
+  const c = catObj(id);
+  const cnt = db.todos.filter(t => t.catId === id).length;
+  const msg = cnt
+    ? `'${c.name}' 카테고리와 그 안의 할 일 ${cnt}개를 모두 삭제할까요?`
+    : `'${c.name}' 카테고리를 삭제할까요?`;
+  if (!confirm(msg)) return;
+  db.todos = db.todos.filter(t => t.catId !== id);
+  db.cats  = db.cats.filter(c => c.id !== id);
+  save(); toast('🗑 카테고리를 삭제했어요'); render();
+}
+
+/* ============================================================
+   DONE (완료함)
+   ============================================================ */
+function setDoneView(v) {
+  doneView = v;
+  document.getElementById('tog-date').classList.toggle('active', v === 'date');
+  document.getElementById('tog-cat').classList.toggle('active',  v === 'cat');
+  document.getElementById('tog-dcal').classList.toggle('active', v === 'cal');
+  renderDone(); icons();
+}
+
+function renderDone() {
+  const done = db.todos.filter(t => t.done);
+  if (!done.length) {
+    document.getElementById('done-body').innerHTML = `
+      <div class="empty">
+        <div class="empty-ic"><i data-lucide="inbox" size="52"></i></div>
+        <div class="empty-t">완료한 일이 없어요</div>
+        <div class="empty-s">할 일을 완료하면 여기 모여요</div>
+      </div>`;
+    return;
+  }
+  if (doneView === 'cal') {
+    document.getElementById('done-body').innerHTML =
+      buildCalHtml(donCalYear, donCalMonth, donCalSelDay, true);
+    icons(); return;
+  }
+  let html = '';
+  if (doneView === 'date') {
+    const grp = {};
+    done.forEach(t => (grp[t.doneAt || '?'] ||= []).push(t));
+    Object.keys(grp).sort((a,b) => b.localeCompare(a)).forEach(date => {
+      const lbl = date === today() ? `오늘 · ${fmtFull(date)}` : (fmtFull(date) || date);
+      html += `<div class="ghd">${lbl}</div>`;
+      html += grp[date].map(t => doneCard(t)).join('');
+    });
+  } else {
+    const grp = {};
+    done.forEach(t => (grp[t.catId || '?'] ||= []).push(t));
+    Object.entries(grp).forEach(([cid, todos]) => {
+      const c = catObj(cid);
+      const cn = c ? c.name : '미분류'; const cc = c ? c.color : '#A0A8B0';
+      html += `<div class="ghd"><span class="dot" style="background:${cc}"></span>${esc(cn)} (${todos.length})</div>`;
+      html += todos.map(t => doneCard(t)).join('');
+    });
+  }
+  document.getElementById('done-body').innerHTML = html;
+}
+
+function doneCard(todo) {
+  const c  = catObj(todo.catId);
+  const cn = c ? c.name : '미분류'; const cc = c ? c.color : '#A0A8B0';
+  return `<div class="card done">
+    <div class="cbody">
+      <span class="cbadge" style="background:${cc}22;color:${cc}">${esc(cn)}</span>
+      <div class="ctitle">${esc(todo.title)}</div>
+      ${todo.memo ? `<div class="cmemo">${esc(todo.memo)}</div>` : ''}
+      ${todo.doneAt ? `<div class="cdone-meta">완료: ${fmtFull(todo.doneAt)}</div>` : ''}
+    </div>
+    <div class="cactions">
+      <button class="abtn undo" title="완료 취소" onclick="undoDone('${todo.id}')"><i data-lucide="rotate-ccw" size="14"></i></button>
+      <button class="abtn del"  title="삭제"      onclick="delDone('${todo.id}')"><i data-lucide="trash-2" size="14"></i></button>
+    </div>
+  </div>`;
+}
+
+function undoDone(id) {
+  const t = db.todos.find(x => x.id === id); if (!t) return;
+  t.done = false; t.doneAt = null;
+  save(); toast('↩ 완료를 취소했어요'); render();
+}
+function delDone(id) {
+  if (!confirm('정말 삭제할까요?')) return;
+  db.todos = db.todos.filter(t => t.id !== id);
+  save(); toast('🗑 삭제했어요'); render();
+}
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+function openOv(html) {
+  document.getElementById('modal').innerHTML = html;
+  document.getElementById('overlay').style.display = 'flex';
+  icons();
+  setTimeout(() => {
+    const f = document.querySelector('#modal input:not([type=hidden]),#modal textarea');
+    if (f) f.focus();
+  }, 60);
+}
+const closeOv = () => (document.getElementById('overlay').style.display = 'none');
+function onOvClick(e) { if (e.target.id === 'overlay') closeOv(); }
+
+/* — Category modal — */
+const PALETTE = ['#4A6FA5','#E8704A','#6C8E5A','#9B5EA2','#E0A020','#3A9E9E','#D94F6B','#5B7FA6','#7C6FD9','#43A896'];
+let selCol = PALETTE[0];
+
+function openCatModal() {
+  selCol = PALETTE[0];
+  openOv(`
+    <div class="mtitle">카테고리 추가</div>
+    <div class="fg">
+      <label class="fl">이름</label>
+      <input class="fi" id="m-cn" placeholder="예: 업무, 개인, 운동…" maxlength="20"
+        onkeydown="if(event.key==='Enter')saveCat()">
+    </div>
+    <div class="fg">
+      <label class="fl">색상</label>
+      <div class="swatches" id="m-pal">
+        ${PALETTE.map((c,i) =>
+          `<div class="sw${i===0?' sel':''}" style="background:${c}" onclick="pickCol(this,'${c}')"></div>`
+        ).join('')}
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-g" onclick="closeOv()">취소</button>
+      <button class="btn btn-p" onclick="saveCat()">추가</button>
+    </div>`);
+}
+function pickCol(el, c) {
+  selCol = c;
+  document.querySelectorAll('#m-pal .sw').forEach(e => e.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function saveCat() {
+  const name = document.getElementById('m-cn').value.trim();
+  if (!name) { document.getElementById('m-cn').focus(); return; }
+  db.cats.push({ id: uid(), name, color: selCol });
+  save(); closeOv(); toast('📁 카테고리를 추가했어요'); render();
+}
+
+/* — Todo modal — */
+function openTodoModal(todoId, defCatId) {
+  if (!db.cats.length) { toast('먼저 카테고리를 추가해주세요'); return; }
+  const todo = todoId ? db.todos.find(t => t.id === todoId) : null;
+  const curPri = todo?.priority || 'normal';
+  const opts = db.cats.map(c => {
+    const sel = todo ? todo.catId === c.id : defCatId === c.id;
+    return `<option value="${c.id}"${sel?' selected':''}>${esc(c.name)}</option>`;
+  }).join('');
+
+  openOv(`
+    <div class="mtitle">${todo ? '할 일 수정' : '할 일 추가'}</div>
+    <div class="fg">
+      <label class="fl">제목 *</label>
+      <input class="fi" id="m-tt" placeholder="무엇을 해야 할까요?" maxlength="100"
+        value="${esc(todo?.title||'')}"
+        onkeydown="if(event.key==='Enter')document.getElementById('m-mm').focus()">
+    </div>
+    <div class="fg">
+      <label class="fl">메모</label>
+      <textarea class="fta" id="m-mm" placeholder="추가 메모 (선택)">${esc(todo?.memo||'')}</textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">날짜</label>
+      <input class="fi" type="date" id="m-dt" value="${todo?.date||''}">
+    </div>
+    <div class="fg">
+      <label class="fl">카테고리 *</label>
+      <select class="fs" id="m-ct">${opts}</select>
+    </div>
+    <div class="fg">
+      <label class="fl">우선순위</label>
+      <div class="pri-opts">
+        ${[['urgent','🔴 긴급'],['normal','🟡 보통'],['easy','🟢 여유']].map(([v,l]) =>
+          `<div class="pri-opt${curPri===v?' sel':''}" onclick="selPri(this,'${v}')">${l}</div>`
+        ).join('')}
+      </div>
+      <input type="hidden" id="m-pri" value="${curPri}">
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-g" onclick="closeOv()">취소</button>
+      <button class="btn btn-p" onclick="saveTodo('${todoId||''}')">${todo?'저장':'추가'}</button>
+    </div>`);
+}
+
+function selPri(el, v) {
+  document.querySelectorAll('.pri-opt').forEach(e => e.classList.remove('sel'));
+  el.classList.add('sel');
+  document.getElementById('m-pri').value = v;
+}
+
+function saveTodo(todoId) {
+  const title = document.getElementById('m-tt').value.trim();
+  if (!title) { document.getElementById('m-tt').focus(); return; }
+  const memo  = document.getElementById('m-mm').value.trim();
+  const date  = document.getElementById('m-dt').value || null;
+  const catId = document.getElementById('m-ct').value;
+  const priority = document.getElementById('m-pri').value || 'normal';
+  if (todoId) {
+    const t = db.todos.find(x => x.id === todoId);
+    if (t) Object.assign(t, { title, memo, date, catId, priority });
+    toast('✏️ 수정했어요');
+  } else {
+    db.todos.push({ id: uid(), title, memo, date, catId,
+      done: false, doneAt: null, star: false, priority });
+    toast('📝 추가했어요!');
+  }
+  save(); closeOv(); render();
+}
+
+/* — Date modal — */
+function openDateModal(todoId) {
+  const todo = db.todos.find(t => t.id === todoId); if (!todo) return;
+  openOv(`
+    <div class="mtitle">날짜 변경</div>
+    <p style="font-size:15px;font-weight:500;margin-bottom:18px;color:var(--text)">${esc(todo.title)}</p>
+    <div class="fg">
+      <label class="fl">새 날짜</label>
+      <input class="fi" type="date" id="m-nd" value="${todo.date || today()}">
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-g" onclick="closeOv()">취소</button>
+      <button class="btn btn-p" onclick="saveDate('${todoId}')">변경</button>
+    </div>`);
+}
+function saveDate(todoId) {
+  const nd = document.getElementById('m-nd').value; if (!nd) return;
+  const t = db.todos.find(x => x.id === todoId); if (t) t.date = nd;
+  save(); closeOv(); toast(`📅 ${fmtShort(nd)}로 이동했어요`); render();
+}
+
+/* ============================================================
+   CLOUD SYNC (Firebase Realtime Database)
+   ============================================================ */
+let _fbApp  = null;
+let _fbDb   = null;
+let _syncCode  = null;
+let _pushing   = false; // prevents listener→save loop
+
+function _syncCfg() {
+  try { return JSON.parse(localStorage.getItem('haeyaji_fb_cfg') || 'null'); }
+  catch(e) { return null; }
+}
+
+function initSync() {
+  const cfg = _syncCfg();
+  _syncCode = localStorage.getItem('haeyaji_sync_code') || null;
+  if (!cfg || !_syncCode) { setSyncStatus('off'); return; }
+  try {
+    if (!_fbApp) {
+      try { _fbApp = firebase.app('haeyaji'); }
+      catch(e) { _fbApp = firebase.initializeApp(cfg, 'haeyaji'); }
+      _fbDb = firebase.database(_fbApp);
+    }
+    setSyncStatus('syncing');
+    _fbDb.ref('rooms/' + _syncCode).on('value', snap => {
+      const remote = snap.val();
+      if (remote && !_pushing) {
+        db = migrate(JSON.parse(JSON.stringify(remote)));
+        localStorage.setItem(KEY_V2, JSON.stringify(db));
+        render();
+      } else if (!remote) {
+        // 처음 연결 시 로컬 데이터를 클라우드로 올림
+        _fbDb.ref('rooms/' + _syncCode).set(db);
+      }
+      setSyncStatus('ok');
+    }, () => setSyncStatus('error'));
+  } catch(e) {
+    console.error('Firebase 초기화 오류:', e);
+    setSyncStatus('error');
+  }
+}
+
+function pushToCloud() {
+  if (!_fbDb || !_syncCode) return;
+  _pushing = true;
+  setSyncStatus('syncing');
+  _fbDb.ref('rooms/' + _syncCode).set(db)
+    .then(() => { _pushing = false; setSyncStatus('ok'); })
+    .catch(() => { _pushing = false; setSyncStatus('error'); });
+}
+
+function setSyncStatus(s) {
+  const LABELS = {
+    off: '동기화 설정', syncing: '동기화 중…',
+    ok: '동기화 됨', error: '동기화 오류'
+  };
+  ['sync-dot', 'sync-dot-mob'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'sync-dot' + (s !== 'off' ? ' ' + s : '');
+  });
+  ['sync-label', 'sync-label-mob'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = LABELS[s] || '동기화 설정';
+  });
+}
+
+function openSyncModal() {
+  const cfg  = _syncCfg();
+  const code = _syncCode || '';
+  const cfgStr = cfg ? JSON.stringify(cfg, null, 2) : '';
+  openOv(`
+    <div class="mtitle">☁️ 클라우드 동기화</div>
+    <p style="font-size:13px;color:var(--sub);line-height:1.7;margin-bottom:20px">
+      Firebase를 연결하면 여러 기기에서 같은 데이터를 사용할 수 있어요.<br>
+      <a href="https://console.firebase.google.com" target="_blank"
+        style="color:var(--main);font-weight:600">Firebase 콘솔 →</a>
+      에서 무료 프로젝트를 만든 후 아래에 설정값을 붙여넣어 주세요.
+    </p>
+    <div class="fg">
+      <label class="fl">Firebase 설정 (firebaseConfig 객체)</label>
+      <textarea class="fta" id="m-fbcfg"
+        style="font-size:12px;font-family:monospace;min-height:130px"
+        placeholder='{\n  "apiKey": "...",\n  "databaseURL": "https://프로젝트명-rtdb.firebaseio.com",\n  "projectId": "..."\n}'>${esc(cfgStr)}</textarea>
+    </div>
+    <div class="fg">
+      <label class="fl">동기화 코드 — 내 기기끼리만 공유하는 비밀 코드</label>
+      <input class="fi" id="m-scode"
+        placeholder="예: myclass-2025" value="${esc(code)}">
+    </div>
+    <div class="mfoot" style="justify-content:space-between">
+      ${cfg
+        ? `<button class="btn btn-d" onclick="disconnectSync()">연결 해제</button>`
+        : `<div></div>`}
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-g" onclick="closeOv()">취소</button>
+        <button class="btn btn-p" onclick="saveSync()">저장 &amp; 연결</button>
+      </div>
+    </div>`);
+}
+
+function saveSync() {
+  const cfgStr = document.getElementById('m-fbcfg').value.trim();
+  const code   = document.getElementById('m-scode').value.trim();
+  if (!cfgStr || !code) { toast('설정값과 동기화 코드를 모두 입력해주세요'); return; }
+  let cfg;
+  try { cfg = JSON.parse(cfgStr); } catch(e) {
+    toast('JSON 형식이 올바르지 않아요. { } 안의 내용을 확인해주세요'); return;
+  }
+  if (!cfg.databaseURL) {
+    toast('databaseURL이 없어요. Firebase 콘솔에서 Realtime Database를 먼저 만들어주세요'); return;
+  }
+  localStorage.setItem('haeyaji_fb_cfg',  JSON.stringify(cfg));
+  localStorage.setItem('haeyaji_sync_code', code);
+  if (_fbDb && _syncCode) _fbDb.ref('rooms/' + _syncCode).off();
+  _fbApp = null; _fbDb = null;
+  closeOv();
+  toast('☁️ 동기화를 시작할게요!');
+  initSync();
+}
+
+function disconnectSync() {
+  if (!confirm('동기화 연결을 해제할까요?\n데이터는 이 기기에 그대로 남아요.')) return;
+  if (_fbDb && _syncCode) _fbDb.ref('rooms/' + _syncCode).off();
+  localStorage.removeItem('haeyaji_fb_cfg');
+  localStorage.removeItem('haeyaji_sync_code');
+  _fbApp = null; _fbDb = null; _syncCode = null;
+  closeOv();
+  setSyncStatus('off');
+  toast('동기화 연결을 해제했어요');
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+document.getElementById('today-sub').textContent = fmtFull(today());
+render();
+initSync();
+</script>
+</body>
+</html>
